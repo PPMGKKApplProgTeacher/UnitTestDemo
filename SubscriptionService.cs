@@ -91,3 +91,115 @@ public class Subscription
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
 }
+
+
+using NUnit.Framework;
+using System;
+
+[TestFixture]
+public class SubscriptionServiceTests
+{
+    private SubscriptionService _subscriptionService;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _subscriptionService = new SubscriptionService();
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldThrowArgumentException_WhenEmailIsInvalid()
+    {
+        // Arrange
+        string invalidEmail = string.Empty;
+        string tier = "Standard";
+        DateTime startDate = DateTime.Now;
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _subscriptionService.SubscribeUser(invalidEmail, tier, startDate));
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldThrowArgumentException_WhenTierIsInvalid()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        string invalidTier = "Gold"; // Invalid tier
+        DateTime startDate = DateTime.Now;
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _subscriptionService.SubscribeUser(userEmail, invalidTier, startDate));
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldCreateSubscription_WhenValidEmailAndTier()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        string tier = "Premium";
+        DateTime startDate = DateTime.Now;
+
+        // Act
+        var result = _subscriptionService.SubscribeUser(userEmail, tier, startDate);
+
+        // Assert
+        Assert.IsTrue(result);
+        var subscription = _subscriptionService.GetSubscription(userEmail);
+        Assert.AreEqual(userEmail, subscription.UserEmail);
+        Assert.AreEqual(tier, subscription.Tier);
+        Assert.AreEqual(startDate.AddMonths(12), subscription.EndDate);
+    }
+
+    [Test]
+    public void GetSubscription_ShouldThrowInvalidOperationException_WhenSubscriptionDoesNotExist()
+    {
+        // Arrange
+        string nonExistentEmail = "nonexistent@example.com";
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => _subscriptionService.GetSubscription(nonExistentEmail));
+    }
+
+    [Test]
+    public void CancelSubscription_ShouldReturnFalse_WhenSubscriptionIsExpired()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        _subscriptionService.SubscribeUser(userEmail, "Standard", DateTime.Now.AddMonths(-2));
+
+        // Act
+        var result = _subscriptionService.CancelSubscription(userEmail);
+
+        // Assert
+        Assert.IsFalse(result);
+    }
+
+    [Test]
+    public void CancelSubscription_ShouldReturnTrue_WhenSubscriptionIsActive()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        _subscriptionService.SubscribeUser(userEmail, "Standard", DateTime.Now.AddMonths(-1));
+
+        // Act
+        var result = _subscriptionService.CancelSubscription(userEmail);
+
+        // Assert
+        Assert.IsTrue(result);
+        Assert.Throws<InvalidOperationException>(() => _subscriptionService.GetSubscription(userEmail)); // Ensure the subscription is removed
+    }
+
+    [Test]
+    public void CancelSubscription_ShouldRemoveSubscription_WhenCancelled()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        _subscriptionService.SubscribeUser(userEmail, "Standard", DateTime.Now.AddMonths(-1));
+
+        // Act
+        _subscriptionService.CancelSubscription(userEmail);
+
+        // Assert
+        Assert.Throws<InvalidOperationException>(() => _subscriptionService.GetSubscription(userEmail)); // Subscription should be removed
+    }
+}
