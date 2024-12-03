@@ -1,4 +1,4 @@
-localhost/phpmyadminusing System;
+using System;
 using System.Collections.Generic;
 
 public class SubscriptionService
