@@ -256,3 +256,24 @@ namespace CarManager.Tests
     }
 }
 
+[TestFixture("Toyota", "Corolla")]
+[TestFixture("Honda", "Civic")]
+public class CarTests
+{
+    private string make;
+    private string model;
+
+    public CarTests(string make, string model)
+    {
+        this.make = make;
+        this.model = model;
+    }
+
+    [Test]
+    public void Constructor_ShouldInitializeCarCorrectly()
+    {
+        var car = new Car(make, model, 6.5, 50);
+        Assert.AreEqual(make, car.Make);
+        Assert.AreEqual(model, car.Model);
+    }
+}
