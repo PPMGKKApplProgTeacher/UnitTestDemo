@@ -1,11 +1,23 @@
 using System;
+using System.Collections.Generic;
 
 public class Dough
 {
     private const double BaseCaloriesPerGram = 2.0;
 
-    private static readonly double[] FlourModifiers = { 1.5, 1.0 }; // White, Wholegrain
-    private static readonly double[] BakingModifiers = { 0.9, 1.1, 1.0 }; // Crispy, Chewy, Homemade
+    // Dictionaries for Flour and Baking Modifiers
+    private static readonly Dictionary<string, double> FlourModifiers = new()
+    {
+        { "White", 1.5 },
+        { "Wholegrain", 1.0 }
+    };
+
+    private static readonly Dictionary<string, double> BakingModifiers = new()
+    {
+        { "Crispy", 0.9 },
+        { "Chewy", 1.1 },
+        { "Homemade", 1.0 }
+    };
 
     private string flourType;
     private string bakingTechnique;
@@ -23,7 +35,7 @@ public class Dough
         get => this.flourType;
         private set
         {
-            if (value != "White" && value != "Wholegrain")
+            if (!FlourModifiers.ContainsKey(value))
             {
                 throw new ArgumentException("Invalid type of dough.");
             }
@@ -36,7 +48,7 @@ public class Dough
         get => this.bakingTechnique;
         private set
         {
-            if (value != "Crispy" && value != "Chewy" && value != "Homemade")
+            if (!BakingModifiers.ContainsKey(value))
             {
                 throw new ArgumentException("Invalid type of dough.");
             }
@@ -59,14 +71,8 @@ public class Dough
 
     public double CalculateCalories()
     {
-        double flourModifier = this.FlourType == "White" ? FlourModifiers[0] : FlourModifiers[1];
-        double bakingModifier = this.BakingTechnique switch
-        {
-            "Crispy" => BakingModifiers[0],
-            "Chewy" => BakingModifiers[1],
-            "Homemade" => BakingModifiers[2],
-            _ => throw new ArgumentException("Invalid type of dough.")
-        };
+        double flourModifier = FlourModifiers[this.FlourType];
+        double bakingModifier = BakingModifiers[this.BakingTechnique];
 
         return this.Weight * BaseCaloriesPerGram * flourModifier * bakingModifier;
     }
@@ -172,4 +178,3 @@ public class DoughTests
         Assert.AreEqual(expectedCalories, actualCalories, "Calories calculation for the given input is incorrect.");
     }
 }
-
