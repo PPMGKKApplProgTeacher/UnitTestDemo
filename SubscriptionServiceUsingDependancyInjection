@@ -1,0 +1,211 @@
+using System;
+using System.Collections.Generic;
+
+public interface INotificationService
+{
+    void SendNotification(string userEmail, string message);
+}
+
+public class SubscriptionService
+{
+    private readonly INotificationService _notificationService;
+    
+    // Pricing tiers
+    private static readonly Dictionary<string, decimal> PricingTiers = new Dictionary<string, decimal>
+    {
+        { "Basic", 9.99m },
+        { "Standard", 19.99m },
+        { "Premium", 29.99m }
+    };
+    
+    public SubscriptionService(INotificationService notificationService)
+    {
+        _notificationService = notificationService;
+    }
+
+    public bool SubscribeUser(string userEmail, string tier, DateTime startDate)
+    {
+        if (string.IsNullOrEmpty(userEmail) || !PricingTiers.ContainsKey(tier))
+            throw new ArgumentException("Invalid email or tier.");
+
+        var endDate = CalculateSubscriptionEndDate(startDate, tier);
+        var subscription = new Subscription
+        {
+            UserEmail = userEmail,
+            Tier = tier,
+            StartDate = startDate,
+            EndDate = endDate
+        };
+
+        // Send a welcome notification
+        _notificationService.SendNotification(userEmail, $"Welcome to the {tier} plan!");
+
+        return true;
+    }
+
+    public Subscription GetSubscription(string userEmail)
+    {
+        // In a real-world scenario, we'd fetch from a database
+        if (string.IsNullOrEmpty(userEmail))
+            throw new ArgumentException("User email cannot be null or empty.");
+
+        return new Subscription
+        {
+            UserEmail = userEmail,
+            Tier = "Standard",
+            StartDate = DateTime.Now.AddMonths(-1),
+            EndDate = DateTime.Now.AddMonths(1)
+        };
+    }
+
+    public bool CancelSubscription(string userEmail)
+    {
+        var subscription = GetSubscription(userEmail);
+
+        // If the subscription is already expired, it can't be canceled
+        if (subscription.EndDate < DateTime.Now)
+            return false;
+
+        // Send cancellation notification
+        _notificationService.SendNotification(userEmail, "Your subscription has been cancelled.");
+        return true;
+    }
+
+    private DateTime CalculateSubscriptionEndDate(DateTime startDate, string tier)
+    {
+        // Different tiers have different subscription lengths
+        var subscriptionLength = tier switch
+        {
+            "Basic" => 1,
+            "Standard" => 3,
+            "Premium" => 12,
+            _ => throw new ArgumentException("Invalid tier.")
+        };
+        
+        return startDate.AddMonths(subscriptionLength);
+    }
+}
+
+public class Subscription
+{
+    public string UserEmail { get; set; }
+    public string Tier { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
+}
+
+
+using NUnit.Framework;
+using Moq;
+using System;
+
+[TestFixture]
+public class SubscriptionServiceTests
+{
+    private Mock<INotificationService> _mockNotificationService;
+    private SubscriptionService _subscriptionService;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _mockNotificationService = new Mock<INotificationService>();
+        _subscriptionService = new SubscriptionService(_mockNotificationService.Object);
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldThrowArgumentException_WhenEmailIsInvalid()
+    {
+        // Arrange
+        string invalidEmail = string.Empty;
+        string tier = "Standard";
+        DateTime startDate = DateTime.Now;
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _subscriptionService.SubscribeUser(invalidEmail, tier, startDate));
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldThrowArgumentException_WhenTierIsInvalid()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        string invalidTier = "Gold"; // Invalid tier
+        DateTime startDate = DateTime.Now;
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _subscriptionService.SubscribeUser(userEmail, invalidTier, startDate));
+    }
+
+    [Test]
+    public void SubscribeUser_ShouldSendNotification_WhenSubscribed()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        string tier = "Premium";
+        DateTime startDate = DateTime.Now;
+
+        // Act
+        _subscriptionService.SubscribeUser(userEmail, tier, startDate);
+
+        // Assert
+        _mockNotificationService.Verify(ns => ns.SendNotification(userEmail, $"Welcome to the {tier} plan!"), Times.Once);
+    }
+
+    [Test]
+    public void GetSubscription_ShouldReturnCorrectSubscription_WhenValidEmail()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+
+        // Act
+        var subscription = _subscriptionService.GetSubscription(userEmail);
+
+        // Assert
+        Assert.AreEqual(userEmail, subscription.UserEmail);
+        Assert.AreEqual("Standard", subscription.Tier);
+        Assert.IsTrue(subscription.StartDate <= DateTime.Now);
+        Assert.IsTrue(subscription.EndDate >= DateTime.Now);
+    }
+
+    [Test]
+    public void CancelSubscription_ShouldReturnFalse_WhenSubscriptionIsExpired()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        var subscription = new Subscription
+        {
+            UserEmail = userEmail,
+            Tier = "Standard",
+            StartDate = DateTime.Now.AddMonths(-2),
+            EndDate = DateTime.Now.AddMonths(-1) // Expired
+        };
+
+        // Act
+        var result = _subscriptionService.CancelSubscription(userEmail);
+
+        // Assert
+        Assert.IsFalse(result);
+        _mockNotificationService.Verify(ns => ns.SendNotification(userEmail, "Your subscription has been cancelled."), Times.Never);
+    }
+
+    [Test]
+    public void CancelSubscription_ShouldReturnTrue_WhenSubscriptionIsActive()
+    {
+        // Arrange
+        string userEmail = "user@example.com";
+        var subscription = new Subscription
+        {
+            UserEmail = userEmail,
+            Tier = "Standard",
+            StartDate = DateTime.Now.AddMonths(-1),
+            EndDate = DateTime.Now.AddMonths(1) // Active
+        };
+
+        // Act
+        var result = _subscriptionService.CancelSubscription(userEmail);
+
+        // Assert
+        Assert.IsTrue(result);
+        _mockNotificationService.Verify(ns => ns.SendNotification(userEmail, "Your subscription has been cancelled."), Times.Once);
+    }
+}
